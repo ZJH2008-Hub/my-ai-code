@@ -1,0 +1,12 @@
+{
+  "name": "fingertip-bloom",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gesture-controlled particle flower built with Three.js and MediaPipe Hands.",
+  "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "check": "node --check src/main.js && node --check src/flower.js && node --check src/hand-tracker.js && node --check server.mjs"
+  }
+}

@@ -1,0 +1,10 @@
+2026-10-27 15:31:02.624: [INFO] CurrentProfilePath: C:\Users\Lenovo\Desktop\my-ai-code\fingertip-bloom\.tmp\edge-profile\Default
+2026-10-27 15:31:02.624: [INFO] Profiles total count: 1
+2026-10-27 15:31:02.624: [INFO] Profile: name=用户配置 1 path=C:\Users\Lenovo\Desktop\my-ai-code\fingertip-bloom\.tmp\edge-profile\Default lastActive=2026-10-27T15:31:02.611Z
+2026-10-27 15:31:02.624: [INFO] LastUsedProfileDir: C:\Users\Lenovo\Desktop\my-ai-code\fingertip-bloom\.tmp\edge-profile\Default
+2026-10-27 15:31:02.624: [INFO] MostRecentlyActiveProfile: name=用户配置 1 path=C:\Users\Lenovo\Desktop\my-ai-code\fingertip-bloom\.tmp\edge-profile\Default lastActive=2026-10-27T15:31:02.611Z
+2026-10-27 15:31:02.624: [INFO] OnDoneLoading sync enabled: 0
+2026-10-27 15:31:02.624: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-10-27 15:31:02.624: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-10-27 15:31:02.624: [INFO] BookmarksSnapshot Startup total=2 bar=2 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-10-27 15:31:02.626: [INFO] RecordSyncInitDuration has_sync_been_enabled: 0 state: 0

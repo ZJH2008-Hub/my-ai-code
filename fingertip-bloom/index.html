@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="用 MediaPipe Hands 与 Three.js 打造的手势交互粒子花朵。握拳收拢，张开手掌，让花朵在指尖绽放。"
+    />
+    <meta name="theme-color" content="#070b0e" />
+    <title>FLORA — 指尖绽放</title>
+    <link rel="preconnect" href="https://cdn.bootcdn.net" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="stylesheet" href="./src/styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.bootcdn.net/ajax/libs/three.js/0.160.0/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="app-shell" id="app">
+      <canvas id="webgl" aria-label="由粒子构成、可随手势绽放的三维花朵"></canvas>
+      <div class="atmosphere" aria-hidden="true"></div>
+      <div class="grain" aria-hidden="true"></div>
+
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="FLORA 指尖花首页">
+          <span class="brand-mark" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><b></b>
+          </span>
+          <span class="brand-copy">
+            <strong>FLORA</strong>
+            <small>指尖花 · BOTANICAL STUDY</small>
+          </span>
+        </a>
+
+        <div class="topbar-meta">
+          <span class="coordinate">31.2304° N / 121.4737° E</span>
+          <div class="live-status" id="liveStatus">
+            <span class="status-dot"></span>
+            <span id="statusText">演示模式</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="interface">
+        <section class="hero" aria-labelledby="hero-title">
+          <p class="eyebrow">
+            <span>01</span>
+            <span>SENSORY BOTANY</span>
+            <i aria-hidden="true"></i>
+          </p>
+
+          <h1 id="hero-title">
+            让花，<br />
+            <em>在指尖</em>绽放。
+          </h1>
+
+          <p class="lede">
+            一场由呼吸、光粒与手势共同完成的数字植物实验。将手掌交给镜头，花朵会回应你的每一个动作。
+          </p>
+
+          <div class="gesture-guide" aria-label="手势说明">
+            <article class="gesture-item">
+              <span class="gesture-icon fist-icon" aria-hidden="true">
+                <i></i><i></i><i></i><i></i>
+              </span>
+              <span>
+                <b>握 拳</b>
+                <small>收拢为花苞</small>
+              </span>
+            </article>
+            <span class="gesture-divider" aria-hidden="true"></span>
+            <article class="gesture-item">
+              <span class="gesture-icon palm-icon" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i>
+              </span>
+              <span>
+                <b>张 开</b>
+                <small>释放一场盛放</small>
+              </span>
+            </article>
+          </div>
+
+          <div class="hero-actions">
+            <button class="camera-button" id="cameraButton" type="button">
+              <span class="button-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M4 8.5h3.2l1.35-2h7.1l1.35 2H20v10H4v-10Z" />
+                  <circle cx="12" cy="13.3" r="3.2" />
+                </svg>
+              </span>
+              <span id="cameraButtonText">启用手势</span>
+              <span class="button-arrow" aria-hidden="true">↗</span>
+            </button>
+            <p class="privacy-note">
+              <span class="privacy-dot" aria-hidden="true"></span>
+              画面仅在本地浏览器处理
+            </p>
+          </div>
+        </section>
+
+        <aside class="gesture-telemetry" id="gestureTelemetry" aria-label="手势信号">
+          <div class="telemetry-head">
+            <span>GESTURE SIGNAL</span>
+            <span class="telemetry-index">21 POINTS</span>
+          </div>
+          <div class="telemetry-reading">
+            <strong id="bloomValue">78</strong>
+            <span>%</span>
+          </div>
+          <p class="telemetry-state" id="gestureState">BREATHING</p>
+          <div class="signal-track" aria-hidden="true">
+            <span id="signalFill"></span>
+          </div>
+          <div class="signal-ticks" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i>
+          </div>
+        </aside>
+      </main>
+
+      <aside class="camera-panel" id="cameraPanel" aria-label="摄像头与手部关键点预览">
+        <div class="camera-head">
+          <span><i></i> OPTICAL INPUT</span>
+          <span id="cameraFps">CAM OFF</span>
+        </div>
+        <div class="camera-view">
+          <video id="cameraVideo" playsinline muted autoplay></video>
+          <canvas id="landmarkCanvas" width="640" height="480"></canvas>
+          <div class="camera-standby">
+            <span class="standby-scan" aria-hidden="true"></span>
+            <button class="camera-start-button" id="cameraStartButton" type="button">
+              点击开启摄像头
+            </button>
+            <small class="camera-start-hint">仅在本地分析画面</small>
+            <span>等待光学信号</span>
+          </div>
+          <span class="view-corner corner-tl" aria-hidden="true"></span>
+          <span class="view-corner corner-tr" aria-hidden="true"></span>
+          <span class="view-corner corner-bl" aria-hidden="true"></span>
+          <span class="view-corner corner-br" aria-hidden="true"></span>
+        </div>
+        <div class="camera-foot">
+          <span id="previewGesture">NO HAND</span>
+          <span id="confidenceValue">CONF —</span>
+        </div>
+      </aside>
+
+      <div class="side-note" aria-hidden="true">
+        <span>VISION / 21</span>
+        <i></i>
+        <span>REALTIME BLOOM</span>
+      </div>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+      <div class="boot-screen" id="bootScreen">
+        <div class="boot-flower" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
+          <b></b>
+        </div>
+        <p id="bootLabel">正在培育光粒</p>
+        <span class="boot-line" aria-hidden="true"><i></i></span>
+      </div>
+
+      <div class="orientation-note">
+        将手掌完整置于画面中央，并保持 40–80 cm 距离
+      </div>
+    </div>
+
+    <script>
+      window.__flowerBootTimer = window.setTimeout(function () {
+        if (!window.__flowerReady) {
+          var label = document.getElementById("bootLabel");
+          if (label) label.textContent = "三维资源加载较慢，请检查网络连接";
+        }
+      }, 9000);
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

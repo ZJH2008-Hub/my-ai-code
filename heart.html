@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#120519">
+  <title>为你跳动</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #0a0410;
+    }
+
+    body {
+      position: relative;
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      content: "";
+      background:
+        radial-gradient(circle at 20% 15%, rgba(255, 79, 140, 0.16), transparent 34%),
+        radial-gradient(circle at 82% 78%, rgba(122, 58, 255, 0.18), transparent 38%),
+        linear-gradient(145deg, #08030f 0%, #14071d 46%, #09030d 100%);
+    }
+
+    body::after {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      content: "";
+      background-image: linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+      background-size: 100% 4px;
+      mix-blend-mode: soft-light;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+    }
+
+    .caption {
+      position: fixed;
+      left: 50%;
+      bottom: max(7vh, 34px);
+      z-index: 3;
+      width: min(90vw, 580px);
+      color: rgba(255, 237, 245, 0.92);
+      text-align: center;
+      pointer-events: none;
+      transform: translateX(-50%);
+      animation: reveal 1.6s 0.8s both cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .caption span {
+      display: block;
+      margin-bottom: 8px;
+      color: #ff8eb4;
+      font-size: clamp(11px, 1.2vw, 14px);
+      font-weight: 700;
+      letter-spacing: 0.52em;
+      text-indent: 0.52em;
+      text-shadow: 0 0 20px rgba(255, 86, 144, 0.75);
+    }
+
+    .caption strong {
+      font-family: "STKaiti", "KaiTi", "Microsoft YaHei", serif;
+      font-size: clamp(20px, 2.2vw, 30px);
+      font-weight: 400;
+      letter-spacing: 0.18em;
+      text-indent: 0.18em;
+      text-shadow: 0 0 28px rgba(255, 105, 157, 0.3);
+    }
+
+    .hint {
+      position: fixed;
+      top: max(3.5vh, 22px);
+      left: 50%;
+      z-index: 3;
+      color: rgba(255, 219, 232, 0.5);
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      pointer-events: none;
+      transform: translateX(-50%);
+      animation: hint-in 1.2s 1.8s both, hint-out 1.2s 5.5s both;
+    }
+
+    @keyframes reveal {
+      from {
+        opacity: 0;
+        transform: translate(-50%, 18px);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+    }
+
+    @keyframes hint-in {
+      from {
+        opacity: 0;
+        transform: translate(-50%, -8px);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+    }
+
+    @keyframes hint-out {
+      to {
+        opacity: 0.18;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .caption {
+        bottom: 8vh;
+      }
+
+      .caption strong {
+        letter-spacing: 0.1em;
+        text-indent: 0.1em;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .caption,
+      .hint {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="heart-canvas" aria-label="动态爱心"></canvas>
+  <div class="hint">轻触屏幕，让心意绽放</div>
+  <div class="caption">
+    <span>ALWAYS IN MY HEART</span>
+    <strong>为你，千千万万遍</strong>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const canvas = document.querySelector("#heart-canvas");
+      const ctx = canvas.getContext("2d");
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const TAU = Math.PI * 2;
+      const pointer = { x: 0, y: 0, active: false };
+      const stars = [];
+      const heartParticles = [];
+      const backgroundHearts = [];
+      const bursts = [];
+      let width = 0;
+      let height = 0;
+      let dpr = 1;
+      let previousTime = performance.now();
+
+      const random = (min, max) => min + Math.random() * (max - min);
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const easeOutCubic = value => 1 - Math.pow(1 - value, 3);
+
+      function heartPoint(angle, scale = 1) {
+        return {
+          x: scale * 16 * Math.pow(Math.sin(angle), 3),
+          y: -scale * (
+            13 * Math.cos(angle)
+            - 5 * Math.cos(2 * angle)
+            - 2 * Math.cos(3 * angle)
+            - Math.cos(4 * angle)
+          )
+        };
+      }
+
+      function heartPath(context, x, y, size, rotation = 0) {
+        context.save();
+        context.translate(x, y);
+        context.rotate(rotation);
+        context.beginPath();
+        const scale = size / 32;
+        for (let i = 0; i <= 160; i += 1) {
+          const point = heartPoint((i / 160) * TAU, scale);
+          if (i === 0) {
+            context.moveTo(point.x, point.y);
+          } else {
+            context.lineTo(point.x, point.y);
+          }
+        }
+        context.closePath();
+        context.restore();
+      }
+
+      function resize() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        createStars();
+        createHeartParticles();
+        createBackgroundHearts();
+      }
+
+      function createStars() {
+        stars.length = 0;
+        const count = Math.round((width * height) / 9000);
+        for (let i = 0; i < count; i += 1) {
+          stars.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            radius: random(0.35, 1.4),
+            alpha: random(0.12, 0.62),
+            speed: random(0.12, 0.48),
+            phase: Math.random() * TAU
+          });
+        }
+      }
+
+      function createHeartParticles() {
+        heartParticles.length = 0;
+        const count = Math.round(clamp((width * height) / 700, 950, 2400));
+
+        for (let i = 0; i < count; i += 1) {
+          const angle = Math.random() * TAU;
+          const isEdge = i < count * 0.34;
+          const radius = isEdge ? random(0.965, 1.015) : Math.sqrt(Math.random()) * 0.96;
+          const point = heartPoint(angle, radius);
+          const depth = random(0.35, 1);
+
+          heartParticles.push({
+            x: point.x,
+            y: point.y,
+            originX: point.x,
+            originY: point.y,
+            size: (isEdge ? random(0.62, 1.35) : random(0.35, 1.05)) * depth,
+            alpha: isEdge ? random(0.68, 1) : random(0.24, 0.8),
+            depth,
+            phase: Math.random() * TAU,
+            drift: random(0, 0.45),
+            hue: random(332, 352)
+          });
+        }
+      }
+
+      function createBackgroundHearts() {
+        backgroundHearts.length = 0;
+        const count = Math.round(clamp(width / 95, 9, 18));
+        for (let i = 0; i < count; i += 1) {
+          backgroundHearts.push({
+            x: Math.random() * width,
+            y: random(height * 0.45, height * 1.05),
+            size: random(7, 22),
+            speed: random(7, 20),
+            sway: random(12, 45),
+            phase: Math.random() * TAU,
+            alpha: random(0.06, 0.2),
+            rotation: random(-0.45, 0.45)
+          });
+        }
+      }
+
+      function drawStars(time) {
+        for (const star of stars) {
+          const glow = 0.6 + 0.4 * Math.sin(time * star.speed + star.phase);
+          ctx.beginPath();
+          ctx.fillStyle = `rgba(255, 227, 240, ${star.alpha * glow})`;
+          ctx.arc(star.x, star.y, star.radius, 0, TAU);
+          ctx.fill();
+        }
+      }
+
+      function drawBackgroundHearts(time, delta) {
+        for (const heart of backgroundHearts) {
+          heart.y -= heart.speed * delta;
+          heart.phase += delta * 0.7;
+          if (heart.y < -40) {
+            heart.y = height + random(20, 90);
+            heart.x = Math.random() * width;
+          }
+
+          const x = heart.x + Math.sin(heart.phase) * heart.sway;
+          heartPath(ctx, x, heart.y, heart.size, heart.rotation + Math.sin(heart.phase) * 0.08);
+          ctx.strokeStyle = `rgba(255, 117, 162, ${heart.alpha})`;
+          ctx.lineWidth = 0.85;
+          ctx.stroke();
+        }
+      }
+
+      function getBeat(time) {
+        if (reduceMotion) return 0.035;
+        const cycle = (time % 1.42) / 1.42;
+        const first = Math.exp(-Math.pow((cycle - 0.08) / 0.07, 2));
+        const second = Math.exp(-Math.pow((cycle - 0.3) / 0.1, 2));
+        return first * 0.11 + second * 0.065;
+      }
+
+      function drawHeart(time, delta) {
+        const baseScale = Math.min(width, height) * 0.0188;
+        const beat = getBeat(time);
+        const breath = Math.sin(time * 0.85) * 0.012;
+        const pull = Math.sin(time * 0.38) * 0.004;
+        const scale = baseScale * (1 + beat + breath + pull);
+        const centerX = width / 2;
+        const centerY = height * 0.46;
+        const pointerInfluence = pointer.active ? 1 : 0;
+
+        pointer.active = false;
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.globalCompositeOperation = "lighter";
+
+        const aura = ctx.createRadialGradient(0, 10, 8, 0, 10, Math.min(width, height) * 0.33);
+        aura.addColorStop(0, `rgba(255, 55, 126, ${0.13 + beat * 0.8})`);
+        aura.addColorStop(0.38, "rgba(255, 31, 111, 0.06)");
+        aura.addColorStop(1, "rgba(118, 13, 74, 0)");
+        ctx.fillStyle = aura;
+        ctx.fillRect(-width, -height, width * 2, height * 2);
+
+        for (const particle of heartParticles) {
+          const wave = Math.sin(time * 1.55 + particle.phase) * particle.drift;
+          let x = particle.originX * scale * (1 + wave * 0.025);
+          let y = particle.originY * scale * (1 + wave * 0.025);
+
+          if (pointerInfluence) {
+            const dx = x - (pointer.x - centerX);
+            const dy = y - (pointer.y - centerY);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const force = Math.max(0, 1 - distance / 150) * 10;
+            if (distance > 0.01) {
+              x += (dx / distance) * force;
+              y += (dy / distance) * force;
+            }
+          }
+
+          const twinkle = 0.72 + Math.sin(time * 2.1 + particle.phase * 2) * 0.28;
+          const alpha = particle.alpha * twinkle;
+          ctx.beginPath();
+          ctx.fillStyle = `hsla(${particle.hue}, 95%, ${56 + particle.depth * 14}%, ${alpha})`;
+          ctx.arc(x, y, particle.size * (1 + beat * 0.6), 0, TAU);
+          ctx.fill();
+        }
+
+        drawHeartHighlights(time, scale, beat);
+        ctx.restore();
+      }
+
+      function drawHeartHighlights(time, scale, beat) {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+
+        const sheen = ctx.createLinearGradient(-9 * scale, -10 * scale, 12 * scale, 20 * scale);
+        sheen.addColorStop(0, "rgba(255, 233, 242, 0.16)");
+        sheen.addColorStop(0.5, "rgba(255, 84, 146, 0.03)");
+        sheen.addColorStop(1, "rgba(129, 34, 255, 0.1)");
+        heartPath(ctx, 0, 0, 32 * scale);
+        ctx.fillStyle = sheen;
+        ctx.fill();
+
+        for (let i = 0; i < 3; i += 1) {
+          const t = (time * (0.16 + i * 0.02) + i * 0.31) % 1;
+          const sparkle = Math.sin(t * Math.PI);
+          const x = Math.sin(i * 2.3 + time * 0.35) * 8 * scale;
+          const y = (-2 + i * 5) * scale + Math.cos(time * 0.4 + i) * 3 * scale;
+
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(time * 0.3 + i);
+          ctx.strokeStyle = `rgba(255, 221, 235, ${sparkle * 0.5})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(-7 - beat * 6, 0);
+          ctx.lineTo(7 + beat * 6, 0);
+          ctx.moveTo(0, -7 - beat * 6);
+          ctx.lineTo(0, 7 + beat * 6);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.restore();
+      }
+
+      function createBurst(x, y) {
+        const particles = [];
+        for (let i = 0; i < 54; i += 1) {
+          const angle = Math.random() * TAU;
+          const speed = random(55, 250);
+          particles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - random(5, 50),
+            life: random(0.65, 1.25),
+            age: 0,
+            size: random(1.2, 4.8),
+            hue: random(330, 355)
+          });
+        }
+        bursts.push({ x, y, age: 0, life: 1.4, particles });
+      }
+
+      function drawBursts(delta) {
+        for (let index = bursts.length - 1; index >= 0; index -= 1) {
+          const burst = bursts[index];
+          burst.age += delta;
+          const ringProgress = burst.age / burst.life;
+
+          if (ringProgress < 1) {
+            ctx.beginPath();
+            ctx.arc(burst.x, burst.y, easeOutCubic(ringProgress) * 120, 0, TAU);
+            ctx.strokeStyle = `rgba(255, 121, 166, ${(1 - ringProgress) * 0.3})`;
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+          }
+
+          for (const particle of burst.particles) {
+            particle.age += delta;
+            const remaining = Math.max(0, 1 - particle.age / particle.life);
+            particle.vy += 20 * delta;
+            particle.x += particle.vx * delta;
+            particle.y += particle.vy * delta;
+            particle.vx *= 0.988;
+            particle.vy *= 0.988;
+
+            ctx.beginPath();
+            ctx.fillStyle = `hsla(${particle.hue}, 95%, 68%, ${remaining})`;
+            ctx.arc(particle.x, particle.y, particle.size * remaining, 0, TAU);
+            ctx.fill();
+          }
+
+          if (burst.age > Math.max(burst.life, ...burst.particles.map(p => p.life))) {
+            bursts.splice(index, 1);
+          }
+        }
+      }
+
+      function animate(now) {
+        const delta = Math.min((now - previousTime) / 1000, 0.04);
+        const time = now / 1000;
+        previousTime = now;
+
+        ctx.clearRect(0, 0, width, height);
+        drawStars(time);
+        drawBackgroundHearts(time, delta);
+        drawHeart(time, delta);
+        drawBursts(delta);
+
+        requestAnimationFrame(animate);
+      }
+
+      function onPointer(event) {
+        const x = event.clientX;
+        const y = event.clientY;
+        pointer.x = x;
+        pointer.y = y;
+        pointer.active = true;
+        createBurst(x, y);
+      }
+
+      window.addEventListener("resize", resize);
+      window.addEventListener("pointerdown", onPointer);
+      window.addEventListener("keydown", event => {
+        if (event.key === " " || event.key === "Enter") {
+          createBurst(width / 2, height * 0.46);
+        }
+      });
+
+      resize();
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>
