@@ -1,0 +1,5 @@
+my-ai-code.zip 
+.tmp/ 
+__pycache__/ 
+.idea/ 
+.venv/ 
